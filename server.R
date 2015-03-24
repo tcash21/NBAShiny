@@ -38,13 +38,13 @@ for (i in seq(along=tables)) {
 }
 
 halflines <- lDataFrames[[1]]
-games <- lDataFrames[[3]]
-lines <- lDataFrames[[4]]
-teamstats <- lDataFrames[[5]]
-boxscores <- lDataFrames[[7]]
-lookup <- lDataFrames[[8]]
-nbafinal <- lDataFrames[[2]]
-seasontotals <- lDataFrames[[6]]
+games <- lDataFrames[[6]]
+lines <- lDataFrames[[7]]
+teamstats <- lDataFrames[[8]]
+boxscores <- lDataFrames[[10]]
+lookup <- lDataFrames[[11]]
+nbafinal <- lDataFrames[[5]]
+seasontotals <- lDataFrames[[9]]
 
 
 if(dim(halflines)[1] > 0 ){
