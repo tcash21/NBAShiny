@@ -1,3 +1,5 @@
+	
+library(randomForest)
 library(dplyr)
 library(plyr)
 library(RSQLite)
@@ -21,7 +23,7 @@ lDataFrames <- vector("list", length=length(tables))
 
  ## create a data.frame for each table
 for (i in seq(along=tables)) {
-  if(tables[[i]] == 'NBAHalflines' | tables[[i]] == 'NBAlines'){
+  if(tables[[i]] == 'NBASBHalfLines' | tables[[i]] == 'NBASBLines'){
    lDataFrames[[i]] <- dbGetQuery(conn=con, statement=paste0("SELECT n.away_team, n.home_team, n.game_date, n.line, n.spread, n.game_time from '", tables[[i]], "' n inner join
   (select game_date, away_team,home_team, max(game_time) as mgt from '", tables[[i]], "' group by game_date, away_team, home_team) s2 on s2.game_date = n.game_date and
   s2.away_team = n.away_team and s2.home_team = n.home_team and n.game_time = s2.mgt and n.game_date = '", format(as.Date(input$date),"%m/%d/%Y"),  "';"))
@@ -37,12 +39,12 @@ for (i in seq(along=tables)) {
   cat(tables[[i]], ":", i, "\n")
 }
 
-halflines <- lDataFrames[[1]]
+halflines <- lDataFrames[[2]]
 games <- lDataFrames[[6]]
-lines <- lDataFrames[[7]]
+lines <- lDataFrames[[3]]
 teamstats <- lDataFrames[[8]]
 boxscores <- lDataFrames[[10]]
-lookup <- lDataFrames[[11]]
+lookup <- lDataFrames[[4]]
 nbafinal <- lDataFrames[[5]]
 seasontotals <- lDataFrames[[9]]
 
@@ -60,11 +62,10 @@ boxscores <- boxscores[,c(1,2,16:21,6:15)]
 
 m1<-merge(boxscores, games, by="game_id")
 m1$key <- paste(m1$team, m1$game_date)
-teamstats$team<-lookup[match(teamstats$team, lookup$espn_name),]$espn_abbr
 teamstats$key <- paste(teamstats$team, teamstats$the_date)
 m2<-merge(m1, teamstats, by="key")
-lookup$away_team <- lookup$covers_team
-lookup$home_team <- lookup$covers_team
+lookup$away_team <- lookup$sb_team
+lookup$home_team <- lookup$sb_team
 
 ## Total Lines
 lines$game_time<-as.POSIXlt(lines$game_time)
@@ -159,7 +160,6 @@ colnames(seasontotals)[2] <- "GAME_DATE"
 #today <- format(Sys.Date(), "%m/%d/%Y")
 #seasontotals <- subset(seasontotals, GAME_DATE == today)
 all$key <- paste(all$GAME_DATE, all$TEAM)
-seasontotals$TEAM<-lookup[match(seasontotals$TEAM, lookup$espn_name),]$espn_abbr
 seasontotals$key <- paste(seasontotals$GAME_DATE, seasontotals$TEAM)
 
 x<-merge(seasontotals, all, by=c("key"))
@@ -201,14 +201,14 @@ f$chd_to <- rep(aggregate(TO ~ GAME_ID, data=f, function(x) sum(x) / 2)[,2], eac
 f$chd_oreb <- rep(aggregate(OREB ~ GAME_ID, data=f, function(x) sum(x) / 2)[,2], each=2)
 
 ## load nightly model trained on all previous data
-load("~/sports/nightlyModel.Rdat")
+load("~/sports/models/NBAhalftimeOversModel.Rdat")
 
 f<-f[order(f$GAME_ID),]
 #f<-ddply(f, .(GAME_ID), transform, half_diff=HALF_PTS[1] - HALF_PTS[2])
 f$team <- ""
 f[seq(from=1, to=dim(f)[1], by=2),]$team <- "TEAM1"
 f[seq(from=2, to=dim(f)[1], by=2),]$team <- "TEAM2"
-f <- f[,c(13,1,30:32,47,48,50,51,53:68)]
+#f <- f[,c(13,1,30:32,47,48,50,51,53:68)]
 #f<-f[order(f$GAME_ID),]
 wide <- reshape(f, direction = "wide", idvar="GAME_ID", timevar="team")
 #train <- wide[,c(4,6:21,24,29:35)]
@@ -218,10 +218,11 @@ wide <- reshape(f, direction = "wide", idvar="GAME_ID", timevar="team")
 #set.seed(21)
 #p <- predict(m, newdata=data.frame(train), interval="predict", level=.75)
 #preds <- p > .5
-result <- wide[,c(1:10,11,19:24)]
+#result <- wide[,c(1:10,11,19:24)]
+result <- wide
 result$GAME_DATE<- strptime(paste(result$GAME_DATE.x.TEAM1, result$GAME_TIME.TEAM1), format="%m/%d/%Y %I:%M %p")
-result <- result[,c(-2,-5)]
-result <- result[,c(1,16,2,3,4:15)]
+#result <- result[,c(-2,-5)]
+#result <- result[,c(1,16,2,3,4:15)]
 
 
 #if(Sys.Date() == input$date){
@@ -231,8 +232,11 @@ result <- result[,c(1,16,2,3,4:15)]
 #result$projectedWinner[which(result$projectedWinner == "TEAM2")] <- result$TEAM.x.TEAM2[which(result$projectedWinner == "TEAM2")]
 #}
 
+colnames(result)[54] <- "MWT"
+colnames(result)[48] <- "SPREAD"
+colnames(result)[62:67] <- c("chd_fg", "chd_fgm", "chd_tpm", "chd_ftm", "chd_to", "chd_oreb")
 
-colnames(result)[3:16] <- c("TEAM1", "TEAM2","LINE","SPREAD", "HALF_LINE", "HALF_SPREAD", "TEAM1_HOME", "MWT", "chd_fg","chd_fgm", "chd_tpm", "chd_ftm", "chd_to", "chd_oreb")
+#colnames(result)[3:16] <- c("TEAM1", "TEAM2","LINE","SPREAD", "HALF_LINE", "HALF_SPREAD", "TEAM1_HOME", "MWT", "chd_fg","chd_fgm", "chd_tpm", "chd_ftm", "chd_to", "chd_oreb")
 #result$SUM_FGP = result$FGP_T1 + result$FGP_T2
 #result$SUM_FTM = result$FTM_T1 + result$FTM_T2
 
@@ -272,21 +276,15 @@ result$chd_ftmU[is.na(result$chd_ftmU)] <- 0
 result$chd_toU[is.na(result$chd_toU)] <- 0
 result$underSum <- result$fullSpreadU + result$mwtU + result$chd_fgU + result$chd_fgmU + result$chd_tpmU + result$chd_ftmU + result$chd_toU
 
-result <- result[,c(1:10,23,31,17:22,24:30,11:16)]
+#result <- result[,c(1:10,23,31,17:22,24:30,11:16)]
 result <- result[order(result$GAME_DATE),]
 result$GAME_DATE <- as.character(result$GAME_DATE)
+colnames(result)[62] <- 'chd_fg.TEAM1'
+load("~/sports/models/NBAhalftimeOversModel.Rdat")
+result$probOver<-predict(r, newdata=result, type="prob")[,2]
+result <- result[,c("GAME_ID",  "GAME_DATE.x.TEAM1", "TEAM1.TEAM1", "TEAM2.TEAM1", "underSum", "overSum", "LINE_HALF.TEAM1", "HALF_PTS.TEAM1", "HALF_PTS.TEAM2", "probOver")]
 
-#if(sum(match(result$GAME_ID, ncaafinal$game_id, 0)) > 0){
-#   n<-ncaafinal[which(ncaafinal$game_id %in% result$GAME_ID),]
-#   d<-ddply(n, .(game_id), transform, won=pts > min(pts))
-#   d<-d[which(d$won == TRUE),]
-#   result$actualWinner <- ""
-#   result[match(d$game_id, result$GAME_ID),]$actualWinner <- d$team
-#} else {
-#    return(result)
-#}
-
-} else{
+}else{
 
 return(data.frame(results="No Results"))
 
