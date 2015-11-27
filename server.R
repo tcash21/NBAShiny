@@ -14,7 +14,7 @@ newData <- reactive({
 
 invalidateLater(30000, session)
 drv <- dbDriver("SQLite")
-con <- dbConnect(drv, "/home/ec2-user/sports/sports.db")
+con <- dbConnect(drv, "/home/ec2-user/sports2015/NBA/sports.db")
 
 tables <- dbListTables(con)
 
@@ -39,14 +39,14 @@ for (i in seq(along=tables)) {
   cat(tables[[i]], ":", i, "\n")
 }
 
-halflines <- lDataFrames[[2]]
-games <- lDataFrames[[6]]
-lines <- lDataFrames[[3]]
-teamstats <- lDataFrames[[8]]
-boxscores <- lDataFrames[[10]]
-lookup <- lDataFrames[[4]]
-nbafinal <- lDataFrames[[5]]
-seasontotals <- lDataFrames[[9]]
+halflines <- lDataFrames[[which(tables == "NBASBHalfLines")]]
+games <- lDataFrames[[which(tables == "NBAGames")]]
+lines <- lDataFrames[[which(tables == "NBASBLines")]]
+teamstats <- lDataFrames[[which(tables == "NBAseasonstats")]]
+boxscores <- lDataFrames[[which(tables == "NBAstats")]]
+lookup <- lDataFrames[[which(tables == "NBASBTeamLookup")]]
+nbafinal <- lDataFrames[[which(tables == "NBAfinalstats")]]
+seasontotals <- lDataFrames[[which(tables == "NBAseasontotals")]]
 
 
 if(dim(halflines)[1] > 0 ){
@@ -120,6 +120,9 @@ if(dim(m3a)[1] > 0){
  m3h$hometeam <- TRUE
  m3h <- m3h[,1:53]
 }
+
+m3a <- unique(m3a)
+m3h <- unique(m3h)
 
 halftime_stats<-rbind(m3a,m3h)
 if(length(which(halftime_stats$game_id %in% names(which(table(halftime_stats$game_id) != 2))) > 0)){
@@ -201,7 +204,7 @@ f$chd_to <- rep(aggregate(TO ~ GAME_ID, data=f, function(x) sum(x) / 2)[,2], eac
 f$chd_oreb <- rep(aggregate(OREB ~ GAME_ID, data=f, function(x) sum(x) / 2)[,2], each=2)
 
 ## load nightly model trained on all previous data
-load("~/sports/models/NBAhalftimeOversModel.Rdat")
+## load("~/sports/models/NBAhalftimeOversModel.Rdat")
 
 f<-f[order(f$GAME_ID),]
 #f<-ddply(f, .(GAME_ID), transform, half_diff=HALF_PTS[1] - HALF_PTS[2])
@@ -280,9 +283,18 @@ result$underSum <- result$fullSpreadU + result$mwtU + result$chd_fgU + result$ch
 result <- result[order(result$GAME_DATE),]
 result$GAME_DATE <- as.character(result$GAME_DATE)
 colnames(result)[62] <- 'chd_fg.TEAM1'
-load("~/sports/models/NBAhalftimeOversModel.Rdat")
-result$probOver<-predict(r, newdata=result, type="prob")[,2]
-result <- result[,c("GAME_ID",  "GAME_DATE.x.TEAM1", "TEAM1.TEAM1", "TEAM2.TEAM1", "underSum", "overSum", "LINE_HALF.TEAM1", "HALF_PTS.TEAM1", "HALF_PTS.TEAM2", "probOver")]
+load("~/sports2015/NBA/nbaRPartModel.Rdat")
+#load('~/sports2015/NBA/randomForest.Rdat')
+colnames(result)[120] <- "mwt.TEAM1"
+colnames(result)[which(colnames(result) == 'chd_fgm')] <- 'chd_fgm.TEAM1'
+colnames(result)[which(colnames(result) == 'chd_fg')] <- 'chd_fg.TEAM1'
+colnames(result)[which(colnames(result) == 'chd_ftm')] <- 'chd_ftm.TEAM1'
+colnames(result)[which(colnames(result) == 'chd_to')] <- 'chd_to.TEAM1'
+colnames(result)[which(colnames(result) == 'chd_oreb')] <- 'chd_oreb.TEAM1'
+colnames(result)[which(colnames(result) == 'chd_tpm')] <- 'chd_tpm.TEAM1'
+
+result$prediction<-predict(rpart.model,newdata=result, type="class")
+result <- result[,c("GAME_ID",  "GAME_DATE.x.TEAM1", "TEAM1.TEAM1", "TEAM2.TEAM1", "underSum", "overSum", "LINE_HALF.TEAM1", "HALF_PTS.TEAM1", "HALF_PTS.TEAM2", "prediction")]
 
 }else{
 
