@@ -207,46 +207,19 @@ f$chd_oreb <- rep(aggregate(OREB ~ GAME_ID, data=f, function(x) sum(x) / 2)[,2],
 ## load("~/sports/models/NBAhalftimeOversModel.Rdat")
 
 f<-f[order(f$GAME_ID),]
-#f<-ddply(f, .(GAME_ID), transform, half_diff=HALF_PTS[1] - HALF_PTS[2])
+
 f$team <- ""
 f[seq(from=1, to=dim(f)[1], by=2),]$team <- "TEAM1"
 f[seq(from=2, to=dim(f)[1], by=2),]$team <- "TEAM2"
-#f <- f[,c(13,1,30:32,47,48,50,51,53:68)]
-#f<-f[order(f$GAME_ID),]
-wide <- reshape(f, direction = "wide", idvar="GAME_ID", timevar="team")
-#train <- wide[,c(4,6:21,24,29:35)]
-#train<-as.matrix(train)
-#train[which(is.na(train))] <- 0
 
-#set.seed(21)
-#p <- predict(m, newdata=data.frame(train), interval="predict", level=.75)
-#preds <- p > .5
-#result <- wide[,c(1:10,11,19:24)]
+wide <- reshape(f, direction = "wide", idvar="GAME_ID", timevar="team")
+
 result <- wide
 result$GAME_DATE<- strptime(paste(result$GAME_DATE.x.TEAM1, result$GAME_TIME.TEAM1), format="%m/%d/%Y %I:%M %p")
-#result <- result[,c(-2,-5)]
-#result <- result[,c(1,16,2,3,4:15)]
-
-
-#if(Sys.Date() == input$date){
-#result$projectedWinner <- "TEAM1"
-#result$projectedWinner[which(as.character(preds) == TRUE)] <- "TEAM2"
-#result$projectedWinner[which(result$projectedWinner == "TEAM1")] <- result$TEAM.x.TEAM1[which(result$projectedWinner == "TEAM1")]
-#result$projectedWinner[which(result$projectedWinner == "TEAM2")] <- result$TEAM.x.TEAM2[which(result$projectedWinner == "TEAM2")]
-#}
 
 colnames(result)[54] <- "MWT"
 colnames(result)[48] <- "SPREAD"
 colnames(result)[62:67] <- c("chd_fg", "chd_fgm", "chd_tpm", "chd_ftm", "chd_to", "chd_oreb")
-
-#colnames(result)[3:16] <- c("TEAM1", "TEAM2","LINE","SPREAD", "HALF_LINE", "HALF_SPREAD", "TEAM1_HOME", "MWT", "chd_fg","chd_fgm", "chd_tpm", "chd_ftm", "chd_to", "chd_oreb")
-#result$SUM_FGP = result$FGP_T1 + result$FGP_T2
-#result$SUM_FTM = result$FTM_T1 + result$FTM_T2
-
-#result$prediction <- p[,1]
-#result$lower <- p[,2]
-#result$upper <- p[,3]
-#result$pred2 <- result$prediction - (result$HALF_PTS.T1 - result$HALF_PTS.T2)
 
 result$mwtO <- as.numeric(result$MWT < 7.1 & result$MWT > -3.9)
 result$chd_fgO <- as.numeric(result$chd_fg < .15 & result$chd_fg > -.07)
@@ -279,12 +252,11 @@ result$chd_ftmU[is.na(result$chd_ftmU)] <- 0
 result$chd_toU[is.na(result$chd_toU)] <- 0
 result$underSum <- result$fullSpreadU + result$mwtU + result$chd_fgU + result$chd_fgmU + result$chd_tpmU + result$chd_ftmU + result$chd_toU
 
-#result <- result[,c(1:10,23,31,17:22,24:30,11:16)]
 result <- result[order(result$GAME_DATE),]
 result$GAME_DATE <- as.character(result$GAME_DATE)
 colnames(result)[62] <- 'chd_fg.TEAM1'
 load("~/sports2015/NBA/nbaRPartModel.Rdat")
-#load('~/sports2015/NBA/randomForest.Rdat')
+
 colnames(result)[120] <- "mwt.TEAM1"
 colnames(result)[which(colnames(result) == 'chd_fgm')] <- 'chd_fgm.TEAM1'
 colnames(result)[which(colnames(result) == 'chd_fg')] <- 'chd_fg.TEAM1'
@@ -293,9 +265,21 @@ colnames(result)[which(colnames(result) == 'chd_to')] <- 'chd_to.TEAM1'
 colnames(result)[which(colnames(result) == 'chd_oreb')] <- 'chd_oreb.TEAM1'
 colnames(result)[which(colnames(result) == 'chd_tpm')] <- 'chd_tpm.TEAM1'
 
-result$prediction<-predict(rpart.model,newdata=result, type="class")
-result <- result[,c("GAME_ID",  "GAME_DATE.x.TEAM1", "TEAM1.TEAM1", "TEAM2.TEAM1", "underSum", "overSum", "LINE_HALF.TEAM1", "HALF_PTS.TEAM1", "HALF_PTS.TEAM2", "prediction")]
+result$FGS_GROUP <- NA
+result[which(result$SPREAD < 3.1),]$FGS_GROUP <- '1'
+result[which(result$SPREAD >= 3.1 & result$SPREAD < 8.1),]$FGS_GROUP <- '2'
+result[which(result$SPREAD >= 8.1),]$FGS_GROUP <- '3'
 
+result$HALF_DIFF <- NA
+result$underDog.TEAM1 <- result$HOME_TEAM.TEAM1 == FALSE & result$SPREAD > 0
+under.teams <- which(result$underDog.TEAM1)
+favorite.teams <- which(!result$underDog.TEAM1)
+result[under.teams,]$HALF_DIFF <- result[under.teams,]$HALF_PTS.TEAM2 - result[under.teams,]$HALF_PTS.TEAM1
+result[favorite.teams,]$HALF_DIFF <- result[favorite.teams,]$HALF_PTS.TEAM1 - result[favorite.teams,]$HALF_PTS.TEAM2
+result$MWTv2 <- result$LINE_HALF.TEAM1 - (result$LINE.TEAM1 /2)
+result$prediction<-predict(rpart.model,newdata=result, type="class")
+result <- result[,c("GAME_ID",  "GAME_DATE.x.TEAM1", "TEAM1.TEAM1", "TEAM2.TEAM1", "FGS_GROUP", "underSum", "overSum", "MWT", "MWTv2", "LINE_HALF.TEAM1", "HALF_DIFF", "HALF_PTS.TEAM1", "HALF_PTS.TEAM2", "prediction")]
+colnames(result)[2:4] <- c("GAME_DATE", "TEAM1", "TEAM2")
 }else{
 
 return(data.frame(results="No Results"))
@@ -303,7 +287,6 @@ return(data.frame(results="No Results"))
 }
 
 return(result)
-#return(f[,c(1,2,30,31,54:67)])
 dbDisconnect(con)
 
 })
@@ -311,11 +294,7 @@ dbDisconnect(con)
 
 
 output$results <- renderChart2({
-#  invalidateLater(5000, session)
-#  dTable(newData(), bPaginate=F, aaSorting=list(c(1,"asc")))
   dTable(newData(), bPaginate=F, aaSorting=list(c(1,"asc")))
-
-
 })
 
 })
