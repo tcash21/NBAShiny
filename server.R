@@ -266,9 +266,15 @@ colnames(result)[which(colnames(result) == 'chd_oreb')] <- 'chd_oreb.TEAM1'
 colnames(result)[which(colnames(result) == 'chd_tpm')] <- 'chd_tpm.TEAM1'
 
 result$FGS_GROUP <- NA
+if(length(which(result$SPREAD < 3.1)) > 0){
 result[which(result$SPREAD < 3.1),]$FGS_GROUP <- '1'
+}
+if(length(which(result$SPREAD >= 3.1 & result$SPREAD < 8.1)) > 0){
 result[which(result$SPREAD >= 3.1 & result$SPREAD < 8.1),]$FGS_GROUP <- '2'
+}
+if(length(which(result$SPREAD >= 8.1)) > 0){
 result[which(result$SPREAD >= 8.1),]$FGS_GROUP <- '3'
+}
 
 result$HALF_DIFF <- NA
 result$underDog.TEAM1 <- result$HOME_TEAM.TEAM1 == FALSE & result$SPREAD > 0
@@ -277,9 +283,43 @@ favorite.teams <- which(!result$underDog.TEAM1)
 result[under.teams,]$HALF_DIFF <- result[under.teams,]$HALF_PTS.TEAM2 - result[under.teams,]$HALF_PTS.TEAM1
 result[favorite.teams,]$HALF_DIFF <- result[favorite.teams,]$HALF_PTS.TEAM1 - result[favorite.teams,]$HALF_PTS.TEAM2
 result$MWTv2 <- result$LINE_HALF.TEAM1 - (result$LINE.TEAM1 /2)
+result$possessions.TEAM1 <- result$HALF_FGA.TEAM1 + (result$HALF_FTA.TEAM1 / 2) + result$HALF_TO.TEAM1 - result$HALF_OREB.TEAM1
+result$possessions.TEAM2 <- result$HALF_FGA.TEAM2 + (result$HALF_FTA.TEAM2 / 2) + result$HALF_TO.TEAM2 - result$HALF_OREB.TEAM2
+result$possessions.TEAM1.SEASON <- result$SEASON_FGA.TEAM1 + (result$SEASON_FTA.TEAM1 / 2) + result$SEASON_TPG.TEAM1 - result$SEASON_ORPG.TEAM1
+result$possessions.TEAM2.SEASON <- result$SEASON_FGA.TEAM2 + (result$SEASON_FTA.TEAM2 / 2) + result$SEASON_TPG.TEAM2 - result$SEASON_ORPG.TEAM2
+result$POSSvE <- NA
+
+## Adjust this for Fav and Dog
+result[under.teams,]$POSSvE <- ((result[under.teams,]$possessions.TEAM2 + result[under.teams,]$possessions.TEAM1) / 2) - ((result[under.teams,]$possessions.TEAM2.SEASON / 
+                                2 + result[under.teams,]$possessions.TEAM1.SEASON / 2) / 2)
+result[favorite.teams,]$POSSvE <- ((result[favorite.teams,]$possessions.TEAM1 + result[favorite.teams,]$possessions.TEAM2) / 2) - ((result[favorite.teams,]$possessions.TEAM1.SEASON / 
+				2 + result[favorite.teams,]$possessions.TEAM2.SEASON / 2) / 2)
+result$P100vE <- NA
+result$P100.TEAM1 <- result$HALF_PTS.TEAM1 / result$possessions.TEAM1 * 100
+result$P100.TEAM1.SEASON <- result$SEASON_PPG.TEAM1 / result$possessions.TEAM1.SEASON * 100
+result$P100.TEAM2 <- result$HALF_PTS.TEAM2 / result$possessions.TEAM2 * 100
+result$P100.TEAM2.SEASON <- result$SEASON_PPG.TEAM2 / result$possessions.TEAM2.SEASON *	100
+
+result$P100_DIFF <- NA
+result[under.teams,]$P100_DIFF <- result[under.teams,]$P100.TEAM2 - result[under.teams,]$P100.TEAM1
+result[favorite.teams,]$P100_DIFF <- result[favorite.teams,]$P100.TEAM1 - result[favorite.teams,]$P100.TEAM2
+result[favorite.teams,]$P100vE <- (result[favorite.teams,]$P100.TEAM1 - result[favorite.teams,]$P100.TEAM1.SEASON) + (result[favorite.teams,]$P100.TEAM2 - 
+					result[favorite.teams,]$P100.TEAM2.SEASON)
+result[under.teams,]$P100vE <- (result[under.teams,]$P100.TEAM2 - result[under.teams,]$P100.TEAM2.SEASON) + (result[under.teams,]$P100.TEAM1 -                        
+                                        result[under.teams,]$P100.TEAM1.SEASON)
+
 result$prediction<-predict(rpart.model,newdata=result, type="class")
-result <- result[,c("GAME_ID",  "GAME_DATE.x.TEAM1", "TEAM1.TEAM1", "TEAM2.TEAM1", "FGS_GROUP", "underSum", "overSum", "MWT", "MWTv2", "LINE_HALF.TEAM1", "HALF_DIFF", "HALF_PTS.TEAM1", "HALF_PTS.TEAM2", "prediction")]
+result$FAV <- ""
+result[which(result$underDog.TEAM1),]$FAV <- result[which(result$underDog.TEAM1),]$TEAM2.TEAM2
+result[which(!result$underDog.TEAM1),]$FAV <- result[which(!result$underDog.TEAM1),]$TEAM1.TEAM1
+result$MWTv3 <- result$SPREAD_HALF.TEAM1 - (result$SPREAD.TEAM2 / 2)
+result <- result[,c("GAME_ID",  "GAME_DATE.x.TEAM1", "TEAM1.TEAM1", "TEAM2.TEAM1","FAV", "FGS_GROUP", "POSSvE", "P100vE", "underSum", "overSum", "MWT", "MWTv2", "MWTv3", 
+		"LINE_HALF.TEAM1", "SPREAD_HALF.TEAM1", "P100_DIFF", "HALF_DIFF", "HALF_PTS.TEAM1", "HALF_PTS.TEAM2", "prediction")]
 colnames(result)[2:4] <- c("GAME_DATE", "TEAM1", "TEAM2")
+colnames(result)[12] <- "2H_LD"
+colnames(result)[13] <- "2H_SD"
+colnames(result)[14] <- "HALF_LINE"
+colnames(result)[15] <- "2H_SPRD"
 }else{
 
 return(data.frame(results="No Results"))
