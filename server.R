@@ -165,23 +165,25 @@ colnames(seasontotals)[2] <- "GAME_DATE"
 all$key <- paste(all$GAME_DATE, all$TEAM)
 seasontotals$key <- paste(seasontotals$GAME_DATE, seasontotals$TEAM)
 
-x<-merge(seasontotals, all, by=c("key"))
-x<- x[,c(-1,-2, -16, -35)]
-final<-x[,c(1:53)]
-colnames(final)[2:12] <- c("SEASON_GP", "SEASON_PPG", "SEASON_ORPG", "SEASON_DEFRPG", "SEASON_RPG", "SEASON_APG", "SEASON_SPG", "SEASON_BGP",
+## HOME/AWAY gets screwed up in this merge
+#x<-merge(seasontotals, all, by=c("key"))
+x <- cbind(all, seasontotals[match(all$key, seasontotals$key),])
+#x<- x[,c(-1,-2, -16, -35)]
+final<-x[,c(1:57)]
+colnames(final)[47:57] <- c("SEASON_GP", "SEASON_PPG", "SEASON_ORPG", "SEASON_DEFRPG", "SEASON_RPG", "SEASON_APG", "SEASON_SPG", "SEASON_BGP",
 "SEASON_TPG", "SEASON_FPG", "SEASON_ATO")
 #final$GAME_DATE <- seasontotals$GAME_DATE[1]
 #final$GAME_DATE<-games[match(final$GAME_ID, games$game_id),]$game_date
-final<-final[order(final$GAME_DATE.x, decreasing=TRUE),]
+final<-final[order(final$GAME_DATE, decreasing=TRUE),]
 
 ## match half stats that have 2nd half lines with final set
 f<-final[which(final$GAME_ID %in% half_stats$game_id),]
 f$mwt <- half_stats[match(f$GAME_ID, half_stats$game_id),]$mwt
 f$half_diff <- half_stats[match(f$GAME_ID, half_stats$game_id),]$half_diff
-f[,2:12] <- apply(f[,2:12], 2, function(x) as.numeric(as.character(x)))
-f[,14:28] <- apply(f[,14:28], 2, function(x) as.numeric(as.character(x)))
-f[,33:48] <- apply(f[,33:48], 2, function(x) as.numeric(as.character(x)))
-f[,50:51] <- apply(f[,50:51], 2, function(x) as.numeric(as.character(x)))
+f[,3:17] <- apply(f[,3:17], 2, function(x) as.numeric(as.character(x)))
+f[,23:37] <- apply(f[,23:37], 2, function(x) as.numeric(as.character(x)))
+f[,47:57] <- apply(f[,47:57], 2, function(x) as.numeric(as.character(x)))
+f[,58:59] <- apply(f[,58:59], 2, function(x) as.numeric(as.character(x)))
 
 ## Team1 and Team2 Halftime Differentials
 f <- f[order(f$GAME_ID),]
@@ -217,9 +219,10 @@ wide <- reshape(f, direction = "wide", idvar="GAME_ID", timevar="team")
 result <- wide
 result$GAME_DATE<- strptime(paste(result$GAME_DATE.x.TEAM1, result$GAME_TIME.TEAM1), format="%m/%d/%Y %I:%M %p")
 
-colnames(result)[54] <- "MWT"
-colnames(result)[48] <- "SPREAD"
-colnames(result)[62:67] <- c("chd_fg", "chd_fgm", "chd_tpm", "chd_ftm", "chd_to", "chd_oreb")
+colnames(result)[58] <- "MWT"
+colnames(result)[38] <- "SPREAD"
+colnames(result)[66:71] <- c("chd_fg", "chd_fgm", "chd_tpm", "chd_ftm", "chd_to", "chd_oreb")
+result$SPREAD <- as.numeric(result$SPREAD)
 
 result$mwtO <- as.numeric(result$MWT < 7.1 & result$MWT > -3.9)
 result$chd_fgO <- as.numeric(result$chd_fg < .15 & result$chd_fg > -.07)
@@ -254,16 +257,18 @@ result$underSum <- result$fullSpreadU + result$mwtU + result$chd_fgU + result$ch
 
 result <- result[order(result$GAME_DATE),]
 result$GAME_DATE <- as.character(result$GAME_DATE)
-colnames(result)[62] <- 'chd_fg.TEAM1'
+colnames(result)[67] <- 'chd_fg.TEAM1'
 load("~/sports2015/NBA/nbaRPartModel.Rdat")
 
-colnames(result)[120] <- "mwt.TEAM1"
+#colnames(result)[120] <- "mwt.TEAM1"
 colnames(result)[which(colnames(result) == 'chd_fgm')] <- 'chd_fgm.TEAM1'
 colnames(result)[which(colnames(result) == 'chd_fg')] <- 'chd_fg.TEAM1'
 colnames(result)[which(colnames(result) == 'chd_ftm')] <- 'chd_ftm.TEAM1'
 colnames(result)[which(colnames(result) == 'chd_to')] <- 'chd_to.TEAM1'
 colnames(result)[which(colnames(result) == 'chd_oreb')] <- 'chd_oreb.TEAM1'
 colnames(result)[which(colnames(result) == 'chd_tpm')] <- 'chd_tpm.TEAM1'
+
+result$SPREAD_HALF.TEAM1<-as.numeric(result$SPREAD_HALF.TEAM1)
 
 result$FGS_GROUP <- NA
 if(length(which(result$SPREAD < 3.1)) > 0){
@@ -276,6 +281,7 @@ if(length(which(result$SPREAD >= 8.1)) > 0){
 result[which(result$SPREAD >= 8.1),]$FGS_GROUP <- '3'
 }
 
+result$LINE_HALF.TEAM1<-as.numeric(result$LINE_HALF.TEAM1)
 result$HALF_DIFF <- NA
 result$underDog.TEAM1 <- result$HOME_TEAM.TEAM1 == FALSE & result$SPREAD > 0
 under.teams <- which(result$underDog.TEAM1)
@@ -312,8 +318,8 @@ result$prediction<-predict(rpart.model,newdata=result, type="class")
 result$FAV <- ""
 result[which(result$underDog.TEAM1),]$FAV <- result[which(result$underDog.TEAM1),]$TEAM2.TEAM2
 result[which(!result$underDog.TEAM1),]$FAV <- result[which(!result$underDog.TEAM1),]$TEAM1.TEAM1
-result$MWTv3 <- result$SPREAD_HALF.TEAM1 - (result$SPREAD.TEAM2 / 2)
-result <- result[,c("GAME_ID",  "GAME_DATE.x.TEAM1", "TEAM1.TEAM1", "TEAM2.TEAM1","FAV", "FGS_GROUP", "POSSvE", "P100vE", "underSum", "overSum", "MWT", "MWTv2", "MWTv3", 
+result$MWTv3 <- result$SPREAD_HALF.TEAM1 - (result$SPREAD / 2)
+result <- result[,c("GAME_ID",  "GAME_DATE", "TEAM1.TEAM1", "TEAM2.TEAM1","FAV", "FGS_GROUP", "POSSvE", "P100vE", "underSum", "overSum", "MWT", "MWTv2", "MWTv3", 
 		"LINE_HALF.TEAM1", "SPREAD_HALF.TEAM1", "P100_DIFF", "HALF_DIFF", "HALF_PTS.TEAM1", "HALF_PTS.TEAM2", "prediction")]
 colnames(result)[2:4] <- c("GAME_DATE", "TEAM1", "TEAM2")
 colnames(result)[12] <- "2H_LD"
