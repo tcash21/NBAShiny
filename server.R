@@ -160,8 +160,6 @@ all <- all[,-grep("REMOVE", colnames(all))]
 ## Add the season total stats
 colnames(seasontotals)[1] <- "TEAM"
 colnames(seasontotals)[2] <- "GAME_DATE"
-#today <- format(Sys.Date(), "%m/%d/%Y")
-#seasontotals <- subset(seasontotals, GAME_DATE == today)
 all$key <- paste(all$GAME_DATE, all$TEAM)
 seasontotals$key <- paste(seasontotals$GAME_DATE, seasontotals$TEAM)
 
@@ -172,8 +170,6 @@ x <- cbind(all, seasontotals[match(all$key, seasontotals$key),])
 final<-x[,c(1:57)]
 colnames(final)[47:57] <- c("SEASON_GP", "SEASON_PPG", "SEASON_ORPG", "SEASON_DEFRPG", "SEASON_RPG", "SEASON_APG", "SEASON_SPG", "SEASON_BGP",
 "SEASON_TPG", "SEASON_FPG", "SEASON_ATO")
-#final$GAME_DATE <- seasontotals$GAME_DATE[1]
-#final$GAME_DATE<-games[match(final$GAME_ID, games$game_id),]$game_date
 final<-final[order(final$GAME_DATE, decreasing=TRUE),]
 
 ## match half stats that have 2nd half lines with final set
@@ -217,7 +213,7 @@ f[seq(from=2, to=dim(f)[1], by=2),]$team <- "TEAM2"
 wide <- reshape(f, direction = "wide", idvar="GAME_ID", timevar="team")
 
 result <- wide
-result$GAME_DATE<- strptime(paste(result$GAME_DATE.x.TEAM1, result$GAME_TIME.TEAM1), format="%m/%d/%Y %I:%M %p")
+result$GAME_DATE<- strptime(paste(result$GAME_DATE.1.TEAM1, result$GAME_TIME.TEAM1), format="%m/%d/%Y %I:%M %p")
 
 colnames(result)[58] <- "MWT"
 colnames(result)[38] <- "SPREAD"
@@ -272,13 +268,13 @@ result$SPREAD_HALF.TEAM1<-as.numeric(result$SPREAD_HALF.TEAM1)
 
 result$FGS_GROUP <- NA
 if(length(which(result$SPREAD < 3.1)) > 0){
-result[which(result$SPREAD < 3.1),]$FGS_GROUP <- '1'
+result[which(abs(result$SPREAD) < 3.1),]$FGS_GROUP <- '1'
 }
-if(length(which(result$SPREAD >= 3.1 & result$SPREAD < 8.1)) > 0){
-result[which(result$SPREAD >= 3.1 & result$SPREAD < 8.1),]$FGS_GROUP <- '2'
+if(length(which(abs(result$SPREAD) >= 3.1 & abs(result$SPREAD) < 8.1)) > 0){
+result[which(abs(result$SPREAD) >= 3.1 & abs(result$SPREAD) < 8.1),]$FGS_GROUP <- '2'
 }
-if(length(which(result$SPREAD >= 8.1)) > 0){
-result[which(result$SPREAD >= 8.1),]$FGS_GROUP <- '3'
+if(length(which(abs(result$SPREAD) >= 8.1)) > 0){
+result[which(abs(result$SPREAD) >= 8.1),]$FGS_GROUP <- '3'
 }
 
 result$LINE_HALF.TEAM1<-as.numeric(result$LINE_HALF.TEAM1)
@@ -307,8 +303,8 @@ result$P100.TEAM2 <- result$HALF_PTS.TEAM2 / result$possessions.TEAM2 * 100
 result$P100.TEAM2.SEASON <- result$SEASON_PPG.TEAM2 / result$possessions.TEAM2.SEASON *	100
 
 result$P100_DIFF <- NA
-result[under.teams,]$P100_DIFF <- result[under.teams,]$P100.TEAM2 - result[under.teams,]$P100.TEAM1
-result[favorite.teams,]$P100_DIFF <- result[favorite.teams,]$P100.TEAM1 - result[favorite.teams,]$P100.TEAM2
+result[under.teams,]$P100_DIFF <- (result[under.teams,]$P100.TEAM2 - result[under.teams,]$P100.TEAM2.SEASON) - (result[under.teams,]$P100.TEAM1 - result[under.teams,]$P100.TEAM1.SEASON)
+result[favorite.teams,]$P100_DIFF <- (result[favorite.teams,]$P100.TEAM1 - result[favorite.teams,]$P100.TEAM1.SEASON) - (result[favorite.teams,]$P100.TEAM2 - result[favorite.teams,]$P100.TEAM2.SEASON)
 result[favorite.teams,]$P100vE <- (result[favorite.teams,]$P100.TEAM1 - result[favorite.teams,]$P100.TEAM1.SEASON) + (result[favorite.teams,]$P100.TEAM2 - 
 					result[favorite.teams,]$P100.TEAM2.SEASON)
 result[under.teams,]$P100vE <- (result[under.teams,]$P100.TEAM2 - result[under.teams,]$P100.TEAM2.SEASON) + (result[under.teams,]$P100.TEAM1 -                        
@@ -318,14 +314,15 @@ result$prediction<-predict(rpart.model,newdata=result, type="class")
 result$FAV <- ""
 result[which(result$underDog.TEAM1),]$FAV <- result[which(result$underDog.TEAM1),]$TEAM2.TEAM2
 result[which(!result$underDog.TEAM1),]$FAV <- result[which(!result$underDog.TEAM1),]$TEAM1.TEAM1
-result$MWTv3 <- result$SPREAD_HALF.TEAM1 - (result$SPREAD / 2)
-result <- result[,c("GAME_ID",  "GAME_DATE", "TEAM1.TEAM1", "TEAM2.TEAM1","FAV", "FGS_GROUP", "POSSvE", "P100vE", "underSum", "overSum", "MWT", "MWTv2", "MWTv3", 
+result$MWTv3 <- abs(result$SPREAD_HALF.TEAM1) - (abs(result$SPREAD) / 2)
+result <- result[,c("GAME_ID",  "GAME_DATE", "TEAM1.TEAM1", "TEAM2.TEAM1","FAV", "SPREAD", "LINE.TEAM1", "FGS_GROUP", "POSSvE", "P100vE", "underSum", "overSum", "MWT", "MWTv2", "MWTv3", 
 		"LINE_HALF.TEAM1", "SPREAD_HALF.TEAM1", "P100_DIFF", "HALF_DIFF", "HALF_PTS.TEAM1", "HALF_PTS.TEAM2", "prediction")]
 colnames(result)[2:4] <- c("GAME_DATE", "TEAM1", "TEAM2")
-colnames(result)[12] <- "2H_LD"
-colnames(result)[13] <- "2H_SD"
-colnames(result)[14] <- "HALF_LINE"
-colnames(result)[15] <- "2H_SPRD"
+colnames(result)[7] <- "LINE"
+colnames(result)[14] <- "2H_LD"
+colnames(result)[15] <- "2H_SD"
+colnames(result)[16] <- "HALF_LINE"
+colnames(result)[17] <- "2H_SPRD"
 }else{
 
 return(data.frame(results="No Results"))
