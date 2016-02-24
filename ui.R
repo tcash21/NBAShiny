@@ -1,22 +1,26 @@
 library(shiny)
 library(rCharts)
  
-shinyUI(pageWithSidebar(
+shinyUI(fluidPage(
   
+  tags$head(
+    tags$link(rel = "stylesheet", type = "text/css", href = "app.css")
+  ),
+ 
   headerPanel(title=""),
   sidebarPanel(
-     includeCSS('app.css'),
+     #includeCSS('app.css'),
      dateInput("date", "Select a date:", value=format(Sys.Date(), "%m/%d/%Y"), format="mm/dd/yyyy")
-#dateInput("date", "Date:", value="03/08/2015", format="mm/dd/yyyy"),
-#verbatimTextOutput("dateText")
     ),
   
   
   
   mainPanel(
-        
-     showOutput('results', 'datatables')
-                   
+     #includeCSS('app.css'),   
+     showOutput('results', 'datatables'),
+     tableOutput('last10'),
+     tableOutput('acc'),
+     tableOutput('acc2')
     )
     
 ))

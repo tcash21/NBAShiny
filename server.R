@@ -1,10 +1,27 @@
-	
+library(data.table)
 library(randomForest)
 library(dplyr)
 library(plyr)
 library(RSQLite)
 library(shiny)
 library(rCharts)
+library(caret)
+
+all <- read.csv("/home/ec2-user/sports2015/NBA/sportsbook.csv")
+all$GAME_DATE <- as.Date(as.character(all$GAME_DATE.TEAM1), format='%m/%d/%Y')
+all <- all[order(all$GAME_DATE),]
+last.10<-data.frame(table(tail(all$Over,n=10)))
+colnames(last.10)[1] <- "Over: Last 10 Games"
+acc <- data.frame(confusionMatrix(table(tail(all,n=10)$prediction, tail(all,n=10)$Over))$overall[1])
+colnames(acc) <- "Model 1 - Accuracy last 10"
+
+load("/home/ec2-user/sports2015/NBA/randomForest_2016-02-08.Rdat")
+ps<-predict(r, tail(all[which(all$GAME_DATE >= as.Date('2016-02-09')), ],n=10))
+acc2 <- data.frame(confusionMatrix(ps, tail(all,n=10)$Over)$overall[1])
+colnames(acc2) <- "Model 2 - Accuracy last 10"
+rm(r)
+
+
 
 options(shiny.trace=TRUE)
 
@@ -48,6 +65,13 @@ lookup <- lDataFrames[[which(tables == "NBASBTeamLookup")]]
 nbafinal <- lDataFrames[[which(tables == "NBAfinalstats")]]
 seasontotals <- lDataFrames[[which(tables == "NBAseasontotals")]]
 
+
+nbafinal <- nbafinal[order(as.Date(nbafinal$timestamp)),]
+nbafinal$timestamp <- as.Date(nbafinal$timestamp)
+nbafinal <- nbafinal[which(nbafinal$timestamp <= as.Date(input$date)),]
+d<-data.table(nbafinal, key="team")
+d<-d[, tail(.SD, 7), by=team]
+avg.points.last.7<-as.data.frame(d[, mean(pts, na.rm = TRUE),by = team])
 
 if(dim(halflines)[1] > 0 ){
 
@@ -125,6 +149,9 @@ m3a <- unique(m3a)
 m3h <- unique(m3h)
 
 halftime_stats<-rbind(m3a,m3h)
+if(length(grep("\\s00", halftime_stats$CoversHalfLineUpdateTime)) > 0){
+	halftime_stats <- halftime_stats[-grep("\\s00", halftime_stats$CoversHalfLineUpdateTime),]
+}
 if(length(which(halftime_stats$game_id %in% names(which(table(halftime_stats$game_id) != 2))) > 0)){
 halftime_stats<-halftime_stats[-which(halftime_stats$game_id %in% names(which(table(halftime_stats$game_id) != 2)) ),]
 }
@@ -213,7 +240,7 @@ f[seq(from=2, to=dim(f)[1], by=2),]$team <- "TEAM2"
 wide <- reshape(f, direction = "wide", idvar="GAME_ID", timevar="team")
 
 result <- wide
-result$GAME_DATE<- strptime(paste(result$GAME_DATE.1.TEAM1, result$GAME_TIME.TEAM1), format="%m/%d/%Y %I:%M %p")
+result$GAME_DATE<- strptime(paste(result$GAME_DATE.1.TEAM1, result$GAME_TIME.TEAM1), format="%m/%d/%Y %H:%M %p")
 
 colnames(result)[58] <- "MWT"
 colnames(result)[38] <- "SPREAD"
@@ -323,14 +350,26 @@ i <- which(result$SPREAD <= 0)
 result$MWTv3[i] <- -result[i,]$SPREAD_HALF.TEAM1 + (result[i,]$SPREAD / 2)
 
 result$probOver<-predict(r,newdata=result, type="prob")[,2]
+
+rm(r)
+
+load("/home/ec2-user/sports2015/NBA/randomForest_2016-02-08.Rdat")
+result$prediction2 <- predict(r,newdata=result, type="class")
+result$probOver2 <- predict(r,newdata=result, type="prob")[,2]
+
 result <- result[,c("GAME_ID",  "GAME_DATE", "TEAM1.TEAM1", "TEAM2.TEAM1","FAV", "SPREAD", "LINE.TEAM1", "FGS_GROUP", "POSSvE", "P100vE", "underSum", "overSum", "MWT", "MWTv2", "MWTv3", 
-		"LINE_HALF.TEAM1", "SPREAD_HALF.TEAM1", "P100_DIFF", "HALF_DIFF", "HALF_PTS.TEAM1", "HALF_PTS.TEAM2", "prediction", "probOver")]
+		"LINE_HALF.TEAM1", "SPREAD_HALF.TEAM1", "P100_DIFF", "HALF_DIFF", "HALF_PTS.TEAM1", "HALF_PTS.TEAM2", "prediction", "probOver", "prediction2", "probOver2")]
 colnames(result)[2:4] <- c("GAME_DATE", "TEAM1", "TEAM2")
 colnames(result)[7] <- "LINE"
 colnames(result)[14] <- "2H_LD"
 colnames(result)[15] <- "2H_SD"
 colnames(result)[16] <- "HALF_LINE"
 colnames(result)[17] <- "2H_SPRD"
+
+i<-avg.points.last.7[match(result$TEAM1, avg.points.last.7$team, 0),]$V1
+result$TEAM1.last7.pts <- i
+i<-avg.points.last.7[match(result$TEAM2, avg.points.last.7$team, 0),]$V1 
+result$TEAM2.last7.pts <- i
 
 }else{
 
@@ -348,6 +387,20 @@ dbDisconnect(con)
 output$results <- renderChart2({
   dTable(newData(), bPaginate=F, aaSorting=list(c(1,"asc")))
 })
+
+output$last10 <- renderTable({
+  last.10
+ }, include.rownames=FALSE)
+
+output$acc <- renderTable({
+   acc
+  }, include.rownames=FALSE)
+
+output$acc2 <- renderTable({
+   acc2
+  }, include.rownames=FALSE)
+
+
 
 })
 
