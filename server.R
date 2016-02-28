@@ -339,8 +339,8 @@ result[under.teams,]$P100vE <- (result[under.teams,]$P100.TEAM2 - result[under.t
 
 result$prediction<-predict(r,newdata=result, type="class")
 result$FAV <- ""
-result[which(result$underDog.TEAM1),]$FAV <- result[which(result$underDog.TEAM1),]$TEAM2.TEAM2
-result[which(!result$underDog.TEAM1),]$FAV <- result[which(!result$underDog.TEAM1),]$TEAM1.TEAM1
+result[which(result$underDog.TEAM1),]$FAV <- result[which(result$underDog.TEAM1),]$TEAM.x.TEAM2
+result[which(!result$underDog.TEAM1),]$FAV <- result[which(!result$underDog.TEAM1),]$TEAM.x.TEAM1
 result$MWTv3 <- 0
 
 i <- which(result$SPREAD > 0)
