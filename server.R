@@ -15,8 +15,10 @@ colnames(last.10)[1] <- "Over: Last 10 Games"
 acc <- data.frame(confusionMatrix(table(tail(all,n=10)$prediction, tail(all,n=10)$Over))$overall[1])
 colnames(acc) <- "Model 1 - Accuracy last 10"
 
-load("/home/ec2-user/sports2015/NBA/randomForest_2016-02-08.Rdat")
-ps<-predict(r, tail(all[which(all$GAME_DATE >= as.Date('2016-02-09')), ],n=10))
+all$half3PM <- all$HALF_3PM.TEAM1 + all$HALF_3PM.TEAM2
+all$halfFTA <- all$HALF_FTA.TEAM1 + all$HALF_FTA.TEAM2
+load("/home/ec2-user/sports2015/NBA/randomForest_2016_02_29.Rdata")
+ps<-predict(r, tail(all[which(all$GAME_DATE >= as.Date('2016-03-01')), ],n=10))
 acc2 <- data.frame(confusionMatrix(ps, tail(all,n=10)$Over)$overall[1])
 colnames(acc2) <- "Model 2 - Accuracy last 10"
 rm(r)
@@ -306,7 +308,7 @@ result[which(abs(result$SPREAD) >= 8.1),]$FGS_GROUP <- '3'
 
 result$LINE_HALF.TEAM1<-as.numeric(result$LINE_HALF.TEAM1)
 result$HALF_DIFF <- NA
-result$underDog.TEAM1 <- result$HOME_TEAM.TEAM1 == FALSE & result$SPREAD > 0
+result$underDog.TEAM1 <- (result$HOME_TEAM.TEAM1 == FALSE & result$SPREAD > 0) | (result$HOME_TEAM.TEAM1 == TRUE & result$SPREAD < 0)
 under.teams <- which(result$underDog.TEAM1)
 favorite.teams <- which(!result$underDog.TEAM1)
 result[under.teams,]$HALF_DIFF <- result[under.teams,]$HALF_PTS.TEAM2 - result[under.teams,]$HALF_PTS.TEAM1
@@ -339,8 +341,8 @@ result[under.teams,]$P100vE <- (result[under.teams,]$P100.TEAM2 - result[under.t
 
 result$prediction<-predict(r,newdata=result, type="class")
 result$FAV <- ""
-result[which(result$underDog.TEAM1),]$FAV <- result[which(result$underDog.TEAM1),]$TEAM.x.TEAM2
-result[which(!result$underDog.TEAM1),]$FAV <- result[which(!result$underDog.TEAM1),]$TEAM.x.TEAM1
+result[which(result$underDog.TEAM1),]$FAV <- result[which(result$underDog.TEAM1),]$TEAM2.TEAM2
+result[which(!result$underDog.TEAM1),]$FAV <- result[which(!result$underDog.TEAM1),]$TEAM1.TEAM1
 result$MWTv3 <- 0
 
 i <- which(result$SPREAD > 0)
@@ -353,7 +355,9 @@ result$probOver<-predict(r,newdata=result, type="prob")[,2]
 
 rm(r)
 
-load("/home/ec2-user/sports2015/NBA/randomForest_2016-02-08.Rdat")
+load("/home/ec2-user/sports2015/NBA/randomForest_2016_02_29.Rdata")
+result$halfFTA <- result$HALF_FTA.TEAM1 + result$HALF_FTA.TEAM2
+result$half3PM <- result$HALF_3PM.TEAM1 + result$HALF_3PM.TEAM2
 result$prediction2 <- predict(r,newdata=result, type="class")
 result$probOver2 <- predict(r,newdata=result, type="prob")[,2]
 
