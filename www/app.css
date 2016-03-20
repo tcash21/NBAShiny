@@ -1,0 +1,21 @@
+.col-sm-4 {
+ width: 15%;
+}
+
+#last10 {
+ position: relative;
+ left: 5px;
+ bottom: -200px;
+} 
+
+#acc {
+ position: relative;
+ left: 5px;
+ bottom: -210px;
+}
+
+#acc2 {
+ position: relative;
+ left: 5px;
+ bottom: -220px;
+}
